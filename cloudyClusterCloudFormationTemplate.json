@@ -20,7 +20,7 @@
     "InstanceType": {
       "Description": "Select the CloudyCluster Control Instance type you will launch.",
       "Type": "String",
-	  "Default" : "t2.small",
+	  "Default" : "t3.small",
       "AllowedValues": [
         "c3.2xlarge",
         "c3.4xlarge",
@@ -98,12 +98,12 @@
         "r4.8xlarge",
         "r4.large",
         "r4.xlarge",
-        "t2.2xlarge",
-        "t2.large",
-        "t2.medium",
-        "t2.micro",
-        "t2.small",
-        "t2.xlarge",
+        "t3.2xlarge",
+        "t3.large",
+        "t3.medium",
+        "t3.micro",
+        "t3.small",
+        "t3.xlarge",
         "x1.16xlarge",
         "x1.32xlarge",
         "x1e.xlarge",
@@ -347,22 +347,22 @@
       "r4.xlarge": {
         "Arch": "64"
       },
-      "t2.2xlarge": {
+      "t3.2xlarge": {
         "Arch": "64"
       },
-      "t2.large": {
+      "t3.large": {
         "Arch": "64"
       },
-      "t2.medium": {
+      "t3.medium": {
         "Arch": "64"
       },
-      "t2.micro": {
+      "t3.micro": {
         "Arch": "64"
       },
-      "t2.small": {
+      "t3.small": {
         "Arch": "64"
       },
-      "t2.xlarge": {
+      "t3.xlarge": {
         "Arch": "64"
       },
       "x1.16xlarge": {
@@ -384,13 +384,13 @@
         "64": "ami-07510a7d"
       },
       "us-east-2": {
-        "64": "ami-0d93b868"
+        "64": "ami-0419147eabdd024f3"
       },
       "us-west-1": {
-        "64": "ami-5b6c6f3b"
+        "64": "ami-0cd23dacc407633e5"
       },
       "us-west-2": {
-        "64": "ami-347ccb4c"
+        "64": "ami-014370c69445f1f76"
       },
       "us-gov-1": {
         "64": "ami-dc6ae3bd"
@@ -770,6 +770,10 @@
     }
   },
   "Outputs" : {
+  "InstanceID" : {
+    "Description" : "The ID of the new CloudyCluster Control Instance:",
+    "Value" : { "Ref" : "CloudyClusterControlNode" }
+  },
   "InstanceIP" : {
     "Description": "The IP Address of the new CloudyCluster Control Instance:",
     "Value" : { "Fn::GetAtt" : [ "CloudyClusterControlNode", "PublicIp" ]}
