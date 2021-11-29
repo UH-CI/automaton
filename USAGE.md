@@ -22,9 +22,9 @@ ccAutomaton Template Generator Arguments (these can also be found by using the -
 -h                    Print help.
 
 Running the ccAutomaton template generator can be done utilizing the following commands:
-Create a new template: python CreateEnvironmentTemplate.py -et CloudyCluster -cf <myConfigurationFile> -tn <templateName>
-List currently created templates: python CreateEnvironmentTemplate.py -et CloudyCluster -lt
-Delete created template: python CreateEnvironmentTemplate.py -et CloudyCluster -dt -tn <templateName>
+Create a new template: python3 CreateEnvironmentTemplates.py -et CloudyCluster -cf <myConfigurationFile> -tn <templateName>
+List currently created templates: python3 CreateEnvironmentTemplates.py -et CloudyCluster -lt
+Delete created template: python3 CreateEnvironmentTemplates.py -et CloudyCluster -dt -tn <templateName>
 
 #########################
 #      Running ccAutomaton      #
@@ -48,7 +48,7 @@ ccAutomaton Arguments:
 -p <profile>         The profile to use for the Resource API.
 -h                   Print help.
 
-Running ccAutomaton with all stages: python Create_Processing_Environment.py -et CloudyCluster -cf ConfigurationFiles/ccAutomaton.conf -all
+Running ccAutomaton with all stages: python3 Create_Processing_Environment.py -et CloudyCluster -cf ConfigurationFiles/ccAutomaton.conf -all
 
 Running ccAutomaton with just delete control and delete environment: Create_Processing_Environment.py -et CloudyCluster -cf ConfigurationFiles/ccAutomaton.conf -dc -dn <domainName, ex: curlewbrotulatopaz.cloudycluster.com> -de -en <environmentName, ex: ccAutomaton-0135> -crn <controlResourceName, ex:arn:aws:cloudformation:eu-west-1:939964386746:stack/ccAutomatonControlResources-85a5/3f748c40-01f8-11e8-8626-50a68642b229>
 #########################

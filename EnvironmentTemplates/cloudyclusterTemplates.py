@@ -41,7 +41,7 @@ class CloudyClusterTemplate(EnvironmentTemplate):
 
     def create(self, cloudType):
         # Add the generic objects to the template and add the reminders to get default values from the user
-        newTemplate = {'clusterError': 'none', 'clusterNumber': 1, 'RecType': 'Cluster', 'clusterSpunUp': 'false', 'rollback': {'status': 'none'}, 'ofa': '0.0.0.0/0', 'completed': 'true', 'hash_key': "<<CLUSTER_UUID>>", 'name': "<<CLUSTER_UUID>>", 'cid': "<<CLUSTER_UUID>>", 'pagesViewed': {'welcome': 'true', 'advanced': 'true', 'finalReview': 'true'}, 'clusterAction': {'status': 'none'}, 'roadTraveled': ['welcome', 'advanced', 'finalReview'], "clusterName": "<<CLUSTER_NAME>>", 'schedulers': [], 's3': [], 'efs': [], 'computeGroups': [], 'webDavs': [], 'workingGroups': [], 'ccVersion': 'Current Version', "sharedHomeDirEnabled": "false", "Region": "<<REGION>>", "k": "<<KEY_NAME>>", "instanceAvailabilityZone": "<<INSTANCE_AVAILABILITY_ZONE>>"}
+        newTemplate = {'clusterError': 'none', 'clusterNumber': 1, 'RecType': 'Cluster', 'clusterSpunUp': 'false', 'rollback': {'status': 'none'}, 'ofa': '0.0.0.0/0', 'completed': 'true', 'hash_key': "<<CLUSTER_UUID>>", 'name': "<<CLUSTER_UUID>>", 'cid': "<<CLUSTER_UUID>>", 'pagesViewed': {'welcome': 'true', 'advanced': 'true', 'finalReview': 'true'}, 'clusterAction': {'status': 'none'}, 'roadTraveled': ['welcome', 'advanced', 'finalReview'], "clusterName": "<<CLUSTER_NAME>>", "efsEncryption": "true", 'schedulers': [], 's3': [], 'efs': [], 'computeGroups': [], 'webDavs': [], 'workingGroups': [], 'ccVersion': 'Current Version', "sharedHomeDirEnabled": "false", "Region": "<<REGION>>", "k": "<<KEY_NAME>>", "instanceAvailabilityZone": "<<INSTANCE_AVAILABILITY_ZONE>>"}
 
         #Instance specific objects so that they can be referenced separately
         validNatParameters = {"instanceType": "nit", "accessFrom": "naf", "volumeType": "VolumeType"}
@@ -471,9 +471,13 @@ class CloudyClusterTemplate(EnvironmentTemplate):
 
             for file in os.listdir(os.path.join(os.path.dirname(__file__), str(self.environmentType))):
                 splitFile = str(file).split(".")
-                if splitFile[1] == "py":
-                    module = __import__(splitFile[0])
-                    templateList[splitFile[0]] = str(module.description)
+                try:
+                    if splitFile[1] == "py":
+                        module = __import__(splitFile[0])
+                        templateList[splitFile[0]] = str(module.description)
+                except IndexError:
+                    print(f"{file} isn't a python file")
+                    pass
             return {"status": "success", "payload": templateList}
         except Exception as e:
             return {"status": "error", "payload": {"error": "Unable to get the template specified.", "traceback": ''.join(traceback.format_exc())}}
