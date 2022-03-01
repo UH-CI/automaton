@@ -11,6 +11,7 @@ import sys
 import tempfile
 import termios
 import time
+import json
 
 import googleapiclient.discovery
 
@@ -30,11 +31,11 @@ class Job:
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.name}>"
 
-    def save_job(self, cloudType):
-        self.job_text(self.job_file, cloudType)
+    def save_job(self, cloudType, scheduler):
+        self.job_text(self.job_file, cloudType, scheduler)
         self.job_file.close()
 
-    def job_text(self, f, cloudType):
+    def job_text(self, f, cloudType, scheduler):
         raise Exception("job_text undefined")
 
     def config(self, n, cloudType):
@@ -59,18 +60,22 @@ class Job:
         os.unlink(self.job_path)
 
 class MPIPreliminaryJob(Job):
-    def job_text(self, f, cloudType):
+    def job_text(self, f, cloudType, scheduler):
+        if scheduler == "Slurm":
+            sched_type = "#SBATCH -N 1"
+        elif scheduler == "Torque":
+            sched_type = "#PBS -l nodes=1"
         if cloudType == "gcp":
-            f.write("""#!/bin/sh
-#SBATCH -N 1
+            f.write(f"""#!/bin/sh
+{sched_type}
 cp -Rp /software/samplejobs /mnt/orangefs
 cd /mnt/orangefs/samplejobs/mpi/GCP
 sh mpi_prime_compile.sh
 """)
 
         else:
-            f.write("""#!/bin/sh
-#SBATCH -N 1
+            f.write(f"""#!/bin/sh
+{sched_type}
 cp -Rp /software/samplejobs /mnt/orangefs
 cd /mnt/orangefs/samplejobs/mpi/AWS
 sh mpi_prime_compile.sh
@@ -95,19 +100,25 @@ sh mpi_prime_compile.sh
         
 
 class MPIJob(Job):
-    def __init__(self, name, output_dir, nodes, processes, instance_type=None, preemptible=False, expected_fail=False):
+    def __init__(self, name, output_dir, nodes, processes, instance_type=None, preemptible=False, expected_fail=False, count=1):
         self.nodes = nodes
         self.processes = processes
         self.instance_type = instance_type
         self.preemptible = preemptible
         self.expected_fail = expected_fail
+        self.count = count
 
         super().__init__(name, output_dir, monitor=False)
 
-    def job_text(self, f, cloudType):
-        f.write(f"""#!/bin/sh
+    def job_text(self, f, cloudType, scheduler):
+        if scheduler == "Slurm":
+            f.write(f"""#!/bin/sh
 #SBATCH -N {self.nodes}
 #SBATCH --ntasks-per-node={self.processes}
+""")
+        elif scheduler == "Torque":
+            f.write(f"""#!/bin/sh
+#PBS -l nodes={self.nodes}:ppn={self.processes}
 """)
         if cloudType == "gcp":
             if self.instance_type:
@@ -118,25 +129,31 @@ class MPIJob(Job):
         f.write(f"""export SHARED_FS_NAME=/mnt/orangefs
 module add openmpi/3.0.0
 cd $SHARED_FS_NAME/samplejobs/mpi
-mpirun -np {self.nodes*self.processes} $SHARED_FS_NAME/samplejobs/mpi/mpi_prime
+""")
+
+        for i in range(self.count):
+            f.write(f"""mpirun -np {self.nodes*self.processes} $SHARED_FS_NAME/samplejobs/mpi/mpi_prime
 """)
 
     def output(self, output, error):
         error_flag = False
         unexpected_output = False
         if error == None or output == None:
-            logger.error("Error: %s does not have the required files for checking output" % self.name)
+            logger.error(f"Error: {self.name} does not have the required files for checking output")
             error_flag = True
         else:
             f = open(output, "r")
             string = f.read()
             f.close()
-            r = r"^Using [0-9]+ tasks to scan [0-9]+ numbers\nDone. Largest prime is [0-9]+ Total primes [0-9]+\nWallclock time elapsed: ([0-9]+(|\.[0-9]+)) seconds\n$"
+            r = "^"
+            for num in range(self.count):
+                r = r + r"Using [0-9]+ tasks to scan [0-9]+ numbers\nDone. Largest prime is [0-9]+ Total primes [0-9]+\nWallclock time elapsed: ([0-9]+(|\.[0-9]+)) seconds\n"
+            r = r + "$"
             m = re.search(r, string)
             if m:
-                logger.info("The job %s was a success" % self.name)
+                logger.info(f"The job {self.name} was a success")
                 x = float(m.group(1))
-                logger.info("match %f seconds" % x)
+                logger.info(f"match {x:.2f} seconds")
             else:
                 unexpected_output = True
 
@@ -151,9 +168,9 @@ mpirun -np {self.nodes*self.processes} $SHARED_FS_NAME/samplejobs/mpi/mpi_prime
 
             if self.expected_fail:
                 if string.startswith("Sorry - this exercise requires an even number of tasks.") and not error_flag:
-                    logger.info("The test %s failed as expected" % self.name)
+                    logger.info(f"The test {self.name} failed as expected")
                 else:
-                    logger.error("The test %s did not fail as expected" % self.name)
+                    logger.error(f"The test {self.name} did not fail as expected")
 
         if error_flag or (unexpected_output and not self.expected_fail):
             self.success = False
@@ -163,22 +180,20 @@ mpirun -np {self.nodes*self.processes} $SHARED_FS_NAME/samplejobs/mpi/mpi_prime
         return ("%2d, %2d" % (self.nodes, self.processes))
 
 class GPUJob(Job):
-    def job_text(self, f, cloudType):
+    def job_text(self, f, cloudType, scheduler):
+        if scheduler == "Slurm":
+            sched = "#SBATCH -N 1"
+        elif scheduler == "Torque":
+            sched = "#PBS -l nodes=1"
         if cloudType == "gcp":
-            f.write("""#!/bin/sh
-#SBATCH -N 1
-#CC -gcpgpu
+            ccq = """#CC -gcpgpu
 #CC -gcpgpusp 1:nvidia-tesla-p100
-#CC -gcpit n1-standard-1
-nvidia-smi
-[ $? -eq 0 ] && echo NVIDIA-SMI successful
-""")
-
-        else:
-            f.write("""#!/bin/sh
-#SBATCH -N 1
-#CC -it g3.4xlarge
-nvidia-smi
+#CC -gcpit n1-standard-1"""
+        elif cloudType == "aws":
+            ccq = "#CC -it g3.4xlarge"
+        f.write(f"""#!/bin/sh
+{sched}
+{ccq}
 [ $? -eq 0 ] && echo NVIDIA-SMI successful
 """)
 
@@ -197,9 +212,13 @@ nvidia-smi
             f.close()
 
 class OrangeFSJob(Job):
-    def job_text(self, f, cloudType):
-        f.write("""#!/bin/sh
-#SBATCH -N 1
+    def job_text(self, f, cloudType, scheduler):
+        if scheduler == "Slurm":
+            sched_type = "#SBATCH -N 1"
+        elif scheduler == "Torque":
+            sched_type = "#PBS -l nodes=1"
+        f.write(f"""#!/bin/sh
+{sched_type}
 pvfs2-ping -m /mnt/orangefs
 dd if=/dev/zero of=/mnt/orangefs/test bs=1048576 count=1024
 sleep 30
@@ -227,6 +246,9 @@ dd if=/mnt/orangefs/test of=/dev/null bs=1048576
             else:
                 logger.error(f"Error: the file for {self.name} had an unexpected value. Please check {error} for more information.")
 
+class ClusterCheckerJob(Job):
+    def job_text(self, f, cloudtype, scheduler):
+        pass
 
 def run(args, timeout=0, die=True, output=None):
     must_close = False
@@ -323,6 +345,7 @@ def main():
         email_flag = cp.get("tester", "email_flag")
         region = cp.get("tester", "region")
         az = cp.get("tester", "az")
+        scheduler = cp.get("tester", "scheduler")
     except configparser.NoSectionError:
         logger.critical("missing configuration section")
         sys.exit(1)
@@ -370,6 +393,8 @@ def main():
     else:
         logger.critical("delete_on_failure not set to true or false")
         sys.exit(1)
+
+    lower_sched = scheduler.lower()
 
     if email_flag == "true":
         email_flag = True
@@ -496,7 +521,7 @@ def main():
     job_config = ""
     i = 0
     for job in jobs:
-        job.save_job(cloudType)
+        job.save_job(cloudType, scheduler)
         job_config = job_config + job.config(i, cloudType) + "\n"
         i = i + 1
 
@@ -517,7 +542,7 @@ cloudType: aws
 # Specifies which AWS credentials profile to use from the ~/.aws/credentials file
 #profile: myprofile
 keyName: {KeyName}
-instanceType: t3.small
+instanceType: t2.small
 networkCidr: 0.0.0.0/0
 vpc: {vpc_id}
 publicSubnet: {subnet_id}
@@ -535,21 +560,31 @@ az: {az}
 
 [Computation]
 #jobScript1: {{"name": "testScript", "options": {{"uploadProtocol": "sftp", "uploadScript": "true", "localPath": "/home/path/test.sh", "remotePath": "/mnt/efsdata", "executeDirectory": "/mnt/efsdata"}}}}
-#workflow1: {{"name": "myWorkflow", "type": "topicModelingPipeline", "options": {{"configFilePath": "/home/path/sample_experiment.py", "sharedFilesystemPath": "/home/path", "pullFromS3": "true", "s3BucketName": "testbucket"}}, "useCCQ": "true", "spotPrice": "0.60", "requestedInstanceTypes": "c4.8xlarge,c4.4xlarge", "schedulerType": "Slurm", "schedulerToUse": "Slurm"}}
+#workflow1: {{"name": "myWorkflow", "type": "topicModelingPipeline", "options": {{"configFilePath": "/home/path/sample_experiment.py", "sharedFilesystemPath": "/home/path", "pullFromS3": "true", "s3BucketName": "testbucket"}}, "useCCQ": "true", "spotPrice": "0.60", "requestedInstanceTypes": "c4.8xlarge,c4.4xlarge", "schedulerType": "{scheduler}", "schedulerToUse": "{scheduler}"}}
 
 {job_config}
 
 # Template definitions
 [tester_template]
-description: Creates a CloudyCluster Environment that contains a single t3.small CCQ enabled Slurm Scheduler, a t3.small Login instance, EFS backed shared home directories, a EFS backed shared filesystem, and a t3.micro NAT instance.
+description: Creates a CloudyCluster Environment that contains a single t2.small CCQ enabled {scheduler} Scheduler, a t2.small Login instance, EFS backed shared home directories, a EFS backed shared filesystem, and a t2.micro NAT instance.
 vpcCidr: 10.0.0.0/16
 fsChoice: OrangeFS
-scheduler1: {{'type': 'Slurm', 'ccq': 'true', 'instanceType': 't3.small', 'name': 'mySlurm', "fsChoice": "OrangeFS"}}
-filesystem1: {{"numberOfInstances": 4, "instanceType": "t3.small", "name": "orangefs", "filesystemSizeGB": "20", "storageVolumeType": "SSD", "orangeFSIops": 0, "instanceIops": 0, 'fsChoice': 'OrangeFS'}}
+scheduler1: {{'type': '{scheduler}', 'ccq': 'true', 'instanceType': 't2.small', 'name': 'my{scheduler}', "fsChoice": "OrangeFS"}}
+filesystem1: {{"numberOfInstances": 4, "instanceType": "t2.small", "name": "orangefs", "filesystemSizeGB": "20", "storageVolumeType": "SSD", "orangeFSIops": 0, "instanceIops": 0, 'fsChoice': 'OrangeFS'}}
 efs1: {{"type": "common"}}
-login1: {{'name': 'Login', 'instanceType': 't3.small', "fsChoice": "OrangeFS"}}
-nat1: {{'instanceType': 't3.micro', 'accessFrom': '0.0.0.0/0'}}
+login1: {{'name': 'Login', 'instanceType': 't2.small', "fsChoice": "OrangeFS"}}
+nat1: {{'instanceType': 't2.micro', 'accessFrom': '0.0.0.0/0'}}
 """)
+        f.close()
+
+        f = open("cloudyClusterCloudFormationTemplate.json", "r+")
+
+        file_contents = json.loads(f.read())
+        f.close()
+        file_contents["Mappings"]["AWSRegionArch2AMI"][region]["64"] = sourceimage
+
+        f = open("cloudyClusterCloudFormationTemplate.json", "w")
+        f.write(json.dumps(file_contents, indent=2))
         f.close()
 
     else:
@@ -590,17 +625,17 @@ region: {region}
 az: {az}
 
 [Computation]
-# workflow1: {{"name": "gcpLargeRun", "type": "videoAnalyticsPipeline", "options": {{"instanceType": "c2-standard-4", "numberOfInstances": "2", "submitInstantly": "True", "usePreemptibleInstances": "true", "maintainPreemptibleSize": "true", "trafficVisionDir": "/software/trafficvision/", "bucketListFile": "list-us-east1", "generatedJobScriptDir": "generated_job_scripts", "trafficVisionExecutable": "process_clip.py", "jobGenerationScript": "generateJobScriptsFromBucketListFile.py", "jobPrefixString": "tv_processing_", "clip_to_start_on": "0", "clip_to_end_on": "100", "useCCQ": "true", "schedulerType": "Slurm", "schedulerToUse": "slurm", "skipProvisioning": "true", "timeLimit": "28800", "createPlaceholderInstances": "True"}}}}
+# workflow1: {{"name": "gcpLargeRun", "type": "videoAnalyticsPipeline", "options": {{"instanceType": "c2-standard-4", "numberOfInstances": "2", "submitInstantly": "True", "usePreemptibleInstances": "true", "maintainPreemptibleSize": "true", "trafficVisionDir": "/software/trafficvision/", "bucketListFile": "list-us-east1", "generatedJobScriptDir": "generated_job_scripts", "trafficVisionExecutable": "process_clip.py", "jobGenerationScript": "generateJobScriptsFromBucketListFile.py", "jobPrefixString": "tv_processing_", "clip_to_start_on": "0", "clip_to_end_on": "100", "useCCQ": "true", "schedulerType": "{scheduler}", "schedulerToUse": "{lower_sched}", "skipProvisioning": "true", "timeLimit": "28800", "createPlaceholderInstances": "True"}}}}
 
-#workflow2: {{"name": "gcpLargeRun", "type": "videoAnalyticsPipeline", "options": {{"instanceType": "c2-standard-16", "numberOfInstances": "2", "submitInstantly": "True", "usePreemptibleInstances": "true", "maintainPreemptibleSize": "true", "trafficVisionDir": "/software/trafficvision/", "bucketListFile": "bucket.list", "generatedJobScriptDir": "generated_job_scripts", "trafficVisionExecutable": "process_clip.py", "jobGenerationScript": "generateJobScriptsFromBucketListFile.py", "jobPrefixString": "tv_processing_", "clip_to_start_on": "0", "clip_to_end_on": "1000000", "useCCQ": "true", "schedulerType": "Slurm", "schedulerToUse": "slurm", "skipProvisioning": "true", "timeLimit": "28800", "createPlaceholderInstances": "True"}}}}
+#workflow2: {{"name": "gcpLargeRun", "type": "videoAnalyticsPipeline", "options": {{"instanceType": "c2-standard-16", "numberOfInstances": "2", "submitInstantly": "True", "usePreemptibleInstances": "true", "maintainPreemptibleSize": "true", "trafficVisionDir": "/software/trafficvision/", "bucketListFile": "bucket.list", "generatedJobScriptDir": "generated_job_scripts", "trafficVisionExecutable": "process_clip.py", "jobGenerationScript": "generateJobScriptsFromBucketListFile.py", "jobPrefixString": "tv_processing_", "clip_to_start_on": "0", "clip_to_end_on": "1000000", "useCCQ": "true", "schedulerType": "{scheduler}", "schedulerToUse": "{lower_sched}", "skipProvisioning": "true", "timeLimit": "28800", "createPlaceholderInstances": "True"}}}}
 
 {job_config}
 
 [tester_template]
-description: Creates a CloudyCluster Environment that contains a single g1-small CCQ enabled Slurm Scheduler, a g1-small Login instance, a 100GB OrangeFS Filesystem, and a g1-small NAT instance.
+description: Creates a CloudyCluster Environment that contains a single g1-small CCQ enabled {scheduler} Scheduler, a g1-small Login instance, a 100GB OrangeFS Filesystem, and a g1-small NAT instance.
 vpcCidr: 10.0.0.0/16
 fsChoice: OrangeFS
-scheduler1: {{'type': 'Slurm', 'ccq': 'true', 'instanceType': 'g1-small', 'name': 'slurm', 'schedAllocationType': 'cons_res', 'fsChoice': 'OrangeFS'}}
+scheduler1: {{'type': '{scheduler}', 'ccq': 'true', 'instanceType': 'g1-small', 'name': '{lower_sched}', 'schedAllocationType': 'cons_res', 'fsChoice': 'OrangeFS'}}
 filesystem1: {{"numberOfInstances": 4, "instanceType": "g1-small", "name": "orangefs", "filesystemSizeGB": "20", "storageVolumeType": "SSD", "orangeFSIops": 0, "instanceIops": 0, 'fsChoice': 'OrangeFS'}}
 login1: {{'name': 'login', 'instanceType': 'g1-small', 'fsChoice': 'OrangeFS'}}
 nat1: {{'instanceType': 'g1-small', 'accessFrom': '0.0.0.0/0'}}
