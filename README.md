@@ -5,7 +5,7 @@ This is an integration of the Automaton system for CloudyCluster environment cre
 
 ## Initial Setup
 
-User will have to create a project on google cloud with a google account and create a service account using 
+User will have to create a project on google cloud with a google account and create a service account using  
 
 
 

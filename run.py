@@ -2,10 +2,10 @@ from tapipy.tapis import Tapis
 from tapipy.actors import get_context
 import subprocess
 # Create python Tapis client for user
-t = Tapis(base_url= "https://tacc.tapis.io", username="lameric", password="L86psHuA*ytWHt")
+# t = Tapis(base_url= "https://tacc.tapis.io", username="lameric", password="L86psHuA*ytWHt")
 # Call to Tokens API to get accest.get_tokens()
 # *** Tapis v3: Call to Tokens API
-t.get_tokens()
+# t.get_tokens()
 
 def init_system(hostname, envname, description = "Default description"):
     s2_system = {
@@ -50,16 +50,22 @@ context = get_context()
 if context['message'] == 'START':
     # Outside of this script, register the vm under my tapis account. Keep systemID and pass it in as part of message.
     # Pass in systemID context["systemID"], send output to system.
-    output = f"{context['_abaco_execution_id']}.txt"
+    output = f"{context['_abaco_execution_id']}.txt" # outfile name is execution id
     with open(output, "w") as outfile:
-        subprocess.run(["bash", "create_cluster"]), stdout=outfile)
+        subprocess.run(["bash", "scripts/create_cluster.sh"], stdout=outfile)
                                                                                                     
-    t.upload(source_file_path=output, system_id="tapis-cloud-vm", dest_file_path=output)
+    #t.upload(source_file_path=output, system_id="tapis-cloud-vm", dest_file_path=output) # saves file to system executing actor
     # envname = context['envname']
     # hostname = context['hostname']
     # appname = context['appname']
     
-    # parse output to get hostname and envname
+    # Parse output to get hostname and envname
+    with open(output, "r") as f:
+        lines = f.read().splitlines()
+        hostname = lines[0]
+        envname = lines[1]
+
+    # Define system with description or no description
     if context['decription']:
         description = context['description']
         s2_system = init_system(hostname = hostname, envname = envname, description = description)
@@ -78,17 +84,19 @@ if context['message'] == 'START':
     #}
 
 # IF context has some sort of flag or if there's no job specified, keep it up.
-
-
-    jobname = context['job']
-    jobname["execSystemID"] = envname
+     
+   
     t.systems.createSystem(**s2_system)
-    # t.apps.createAppVersion(**app_def)
     t.systems.createUserCredential(systemId=envname,
                             userName='testuser',
                             password='Password1')
-    job = t.jobs.submitJob(**jobname)
-    print(job)
+    print("System created")
+
+    if "job" in context.keys():
+        jobname = context['job']
+        jobname["execSystemID"] = envname
+        job = t.jobs.submitJob(**jobname)
+        print(job)
 
 
 if context['message'] == 'TEARDOWN':
