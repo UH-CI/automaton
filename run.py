@@ -6,6 +6,15 @@ import subprocess
 # Call to Tokens API to get accest.get_tokens()
 # *** Tapis v3: Call to Tokens API
 # t.get_tokens()
+try:
+    this_context = get_context()
+    t = Tapis(base_url=this_context["_abaco_api_server"], access_token=this_context['_abaco_access_token'])
+    t.get_tokens()
+    #t.access_token.expires_in()
+
+except Exception as e:
+    print(f"got exception trying to generate tapis client; e: {e}")
+    raise e
 
 def init_system(hostname, envname, description = "Default description"):
     s2_system = {
@@ -42,15 +51,18 @@ def init_system(hostname, envname, description = "Default description"):
     return s2_system
 
 context = get_context()
-
+print(context)
+messages = context['message_dict']
+d=messages['message']
+print("Got JSON: {}".format(d))
 # envname = "lameric_environment55"
 # hostname = "login-pearldeerbowfin.cloudycluster.net"
 # appname = "img-classify.lameric47"
 
-if context['message'] == 'START':
+if raw_message['message'] == 'START':
     # Outside of this script, register the vm under my tapis account. Keep systemID and pass it in as part of message.
     # Pass in systemID context["systemID"], send output to system.
-    output = f"{context['_abaco_execution_id']}.txt" # outfile name is execution id
+    output = f"{context['execution_id']}.txt" # outfile name is execution id
     with open(output, "w") as outfile:
         subprocess.run(["bash", "scripts/create_cluster.sh"], stdout=outfile)
                                                                                                     
@@ -66,8 +78,8 @@ if context['message'] == 'START':
         envname = lines[1]
 
     # Define system with description or no description
-    if context['decription']:
-        description = context['description']
+    if raw_message['decription']:
+        description = raw_message['description']
         s2_system = init_system(hostname = hostname, envname = envname, description = description)
     
     else: s2_system = init_system(hostname = hostname, envname = envname)

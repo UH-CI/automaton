@@ -15,6 +15,6 @@ ENV=${OUTPUT[1]}
 echo $DNS
 echo $ENV
 
-ssh-keyscan login-$DNS >> ~/.ssh/known_hosts
-sshpass -p "Password1" scp scripts/{sbatch.sh,squeue.sh,sacct.sh,.bashrc} testuser@login-$DNS:/mnt/orangefs/testuser/
-#sshpass -p "Password1" ssh testuser@login-$DNS 'echo "Password1" | sudo -S mv /mnt/orangefs/testuser/.bashrc /etc/.bashrc'
+# ssh-keyscan login-$DNS >> ~/.ssh/known_hosts
+# sshpass -p "Password1" scp scripts/{sbatch.sh,squeue.sh,sacct.sh,.bashrc} testuser@login-$DNS:/mnt/orangefs/testuser/
+# sshpass -p "Password1" ssh testuser@login-$DNS 'echo "Password1" | sudo -S mv /mnt/orangefs/testuser/.bashrc /etc/.bashrc'
