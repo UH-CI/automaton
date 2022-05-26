@@ -42,14 +42,12 @@ def init_system(hostname, envname, description = "Default description"):
 
 context = get_context()
 print(context)
-messages = context['message_dict']
-d=messages['message']
-print("Got JSON: {}".format(d))
+d = context['message_dict']
 # envname = "lameric_environment55"
 # hostname = "login-pearldeerbowfin.cloudycluster.net"
 # appname = "img-classify.lameric47"
 
-if raw_message['message'] == 'START':
+if d['message'] == 'START':
     # Outside of this script, register the vm under my tapis account. Keep systemID and pass it in as part of message.
     # Pass in systemID context["systemID"], send output to system.
     output = f"{context['execution_id']}.txt" # outfile name is execution id
@@ -68,7 +66,7 @@ if raw_message['message'] == 'START':
         envname = lines[1]
 
     # Define system with description or no description
-    if raw_message['decription']:
+    if d['decription']:
         description = raw_message['description']
         s2_system = init_system(hostname = hostname, envname = envname, description = description)
     
