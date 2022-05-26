@@ -42,7 +42,7 @@ def init_system(hostname, envname, description = "Default description"):
 
 context = get_context()
 print(context)
-t = Tapis(base_url=this_context["_abaco_api_server"], access_token=this_context['_abaco_access_token'])
+t = Tapis(base_url=context["_abaco_api_server"], access_token=context['_abaco_access_token'])
 d = context['message_dict']
 # envname = "lameric_environment55"
 # hostname = "login-pearldeerbowfin.cloudycluster.net"
