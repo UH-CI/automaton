@@ -9,8 +9,9 @@ import subprocess
 try:
     this_context = get_context()
     t = Tapis(base_url=this_context["_abaco_api_server"], access_token=this_context['_abaco_access_token'])
-    t.get_tokens()
-    #t.access_token.expires_in()
+    print(t.access_token)
+
+    t.access_token.expires_in()
 
 except Exception as e:
     print(f"got exception trying to generate tapis client; e: {e}")
