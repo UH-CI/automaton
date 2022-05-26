@@ -6,17 +6,6 @@ import subprocess
 # Call to Tokens API to get accest.get_tokens()
 # *** Tapis v3: Call to Tokens API
 # t.get_tokens()
-try:
-    this_context = get_context()
-    t = Tapis(base_url=this_context["_abaco_api_server"], access_token=this_context['_abaco_access_token'])
-    print(t.access_token)
-
-    t.access_token.expires_in()
-
-except Exception as e:
-    print(f"got exception trying to generate tapis client; e: {e}")
-    raise e
-
 def init_system(hostname, envname, description = "Default description"):
     s2_system = {
         "id": envname,
