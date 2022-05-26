@@ -66,8 +66,8 @@ if d['message'] == 'START':
         envname = lines[1]
 
     # Define system with description or no description
-    if d['decription']:
-        description = raw_message['description']
+    if d['description']:
+        description = d['description']
         s2_system = init_system(hostname = hostname, envname = envname, description = description)
     
     else: s2_system = init_system(hostname = hostname, envname = envname)
