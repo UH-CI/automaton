@@ -86,12 +86,14 @@ if d['message'] == 'START':
 
 # IF context has some sort of flag or if there's no job specified, keep it up.
      
-   
+    print("Creating System") 
+    print(s2_system)
     t.systems.createSystem(**s2_system)
     t.systems.createUserCredential(systemId=envname,
                             userName='testuser',
                             password='Password1')
     print("System created")
+    print(s2_system)
 
     if "job" in context.keys():
         jobname = context['job']
