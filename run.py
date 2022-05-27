@@ -63,6 +63,7 @@ if d['message'] == 'START':
     # Parse output to get hostname and envname
     with open(output, "r") as f:
         lines = f.read().splitlines()
+        print(lines)
         hostname = lines[0]
         envname = lines[1]
 
