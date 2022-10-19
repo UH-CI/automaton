@@ -105,7 +105,7 @@ if d['message'] == 'START':
 
 if context['message'] == 'TEARDOWN':
     # Pass in systemID context["systemID"], this system will be the cluster systemID, do a remove system call and also look at ID and HOST keys for envname and hostname.
-    infofile = t.files.getContents(systemId="tapis-cloud-vm", path="automaton/automaton/infoFile").split(b"\n")
+    infofile = t.files.getContents(systemId=context["systemID"], path="automaton/automaton/infoFile").split(b"\n")
     dns = infofile[0].decode("utf-8")
     env = infofile[1].decode("utf-8")
 
